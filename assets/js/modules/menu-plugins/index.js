@@ -1,5 +1,6 @@
 customElements.define(`menu-plugins`, class extends HTMLElement {
 
+    // test
     constructor() {
         super();
         this.parent = this;
