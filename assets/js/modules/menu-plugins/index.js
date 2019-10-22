@@ -1,3 +1,12 @@
+//lien: https://jsbin.com/zelepix/edit?html,js,console,output
+
+// 1) Gérer suppresion de l'audioNode dans le tableau et actualiser connexion
+// 2) Bug visuel du bouton de suppresion de plugin à corriger
+// 3) Virer tous plugins n'ayant aucun input (DrumMachine, Synthe)
+// 3) Gérer déplacement pédale (gérer le déplacement aussi dans le tableau d'audioNode et actualiser les connexions)
+// 4) Faire précédent dans le menu des choix des plugins
+// 5) Faire du rack une wap
+
 customElements.define(`menu-plugins`, class extends HTMLElement {
 
     // test
@@ -8,6 +17,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         this.params = {
             url: (this.getAttribute(`url`) || `urlTest`)
         };
+        this.audioSrc = `./assets/audio/BasketCaseGreendayriffDI.mp3`;
         this.pathJSON = `https://mainline.i3s.unice.fr/WebAudioPluginBank/repository.json`;
         this.pluginsJSON = {};
         (async () => this.buildMenuPlugins(await this.loadJSONPlugins()))();
@@ -53,10 +63,13 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         .optionMenu{
             background: #333;
             display: flex;
-            flex-direction: row;
+            flex-direction: column;
             border-top-left-radius: 4px;
             border-top-right-radius: 4px;
             padding: 5px;
+            margin: 2px;
+            position: relative;
+            justify-content: center;
         }
         .optionMenu div{
             display:flex;
@@ -89,12 +102,9 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             border-radius: 100%;
             align-self: flex-start;
             cursor: pointer;
-        }
-
-
-        .invokedPlugin{
-            height: 200px;
-            margin: 8px;
+            position: absolute;
+            top: 4px;
+            right: 4px;
         }
 
         .leftButton{
@@ -127,21 +137,26 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             height:100vh;
 
             overflow:hidden;
-
+            display: flex;
+            flex-direction: column;
         }
+
         #div_menu ul{
             list-style:none;
             display:flex;
             flex-direction:row;
-            overflow:scroll;
+            overflow-x: scroll;
+            overflow-y: hidden;
         }
         #ampSimsList{
-            height:230px;
+            justify-content: center;
         }
         
         #pluginsList{
             height:500px;
-            flex-wrap:wrap;
+            width:calc(100% - 500px);
+            z-index:1;
+            transition:1s;
         }
         #pluginsList li img{
 
@@ -244,10 +259,34 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         }
 
         #div_plugins{
+            background: #000;
             border:1px solid #555;
             display:flex;
             flex-direction:column;
-            width:40%;
+            width:calc(500px - 2px);
+            height:500px;
+            position:relative;
+            transition:0.7s;
+            position:absolute;
+            top:0px;
+            right:0px;
+            z-index:2;
+        }
+
+        .hideMenu{
+            transform: translate(498px);
+        }
+        #div_plugins #bt_hideMenu{background: #000;
+            border-width: 1px 0px 1px 1px;
+            border-color: #555;
+            border-style: solid;
+            color: #555;
+            position:absolute;
+            top:-1px;
+            left:-49px;
+            width:49px;
+            height:49px;
+            cursor:pointer;
         }
         #div_plugins select{
             -webkit-appearance:none; /* remove the strong OSX influence from Webkit */
@@ -264,31 +303,33 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         #section_plugins{
             display:flex;
             flex-direction:row;
+            position:relative;
         }
         #section_plugins #pluginsList,
         #section_plugins #nav_plugins{
             background-color: #000000;
             background-image: url("https://www.transparenttextures.com/patterns/grilled-noise.png");
             /* This is mostly intended for prototyping; please download the pattern and re-host for production environments. Thank you! */
-            border:1px solid #555;
             padding:10px;
-        }
-        #section_plugins #pluginsList{
-            flex:1;
         }
         audio{
             width:calc(100% - 40px);
             margin:20px;
             border-radius:0px;
         }
+        .new_plugin {
+            align-self: center;
+            margin: 10px;
+        }
         `;
         this.html = `
         <div id='div_menu'>
-            <audio src="./assets/audio/BasketCaseGreendayriffDI.mp3" id="soundSample" controls loop></audio>
+            <audio src="${this.audioSrc}" id="soundSample" controls loop></audio>
 
             <section id='section_plugins'>
                 <ul id='pluginsList'></ul>
                 <div id='div_plugins'>
+                    <button id='bt_hideMenu'>></button>
                     <select id='select_plugins'>
                     <option selected disabled>Choose plugin category</option>
                     </select>
@@ -296,8 +337,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
                 </div>
             </section>
             
-            
-            <ul id='ampSimsList'><div id="addAmp">+</div></ul>
+            <ul id='ampSimsList'></ul>
         </div>
         `;
         this.root.innerHTML = `<style>${this.css}</style><div id='wrapper'>${this.html}</div>`;
@@ -318,11 +358,12 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         this.choiceCategoryPlugin = this.shadowRoot.querySelector("#choiceCategoryPlugin")
         this.div_menu = this.shadowRoot.querySelector(`#div_menu`);
         this.pluginsList = this.shadowRoot.querySelector(`#pluginsList`);
-        this.addAmp = this.shadowRoot.querySelector("#addAmp");
         this.ampSimsList = this.shadowRoot.querySelector(`#ampSimsList`);
         this.select_plugins = this.shadowRoot.querySelector("#select_plugins");
         this.nav_plugins = this.shadowRoot.querySelector(`#nav_plugins`);
-
+        this.div_plugins = this.shadowRoot.querySelector(`#div_plugins`);
+        this.bt_hideMenu = this.shadowRoot.querySelector(`#bt_hideMenu`);
+        this.section_plugins = this.shadowRoot.querySelector(`#section_plugins`);
         this.familyChoosen = [];
         this.ampChoosen = [];
 
@@ -333,8 +374,8 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         this.pluginListJson;
         this.instanciation = 0;
 
-        this.addAmp.addEventListener("click", (e) => this.chooseAmp(e));
         this.select_plugins.onchange = (e) => this.selectCategory(e);
+        this.bt_hideMenu.onclick = () => this.hideMenu();
 
 
 
@@ -370,16 +411,18 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         })
 
     }
-    //lien: https://jsbin.com/zelepix/edit?html,js,console,output
 
-    // 1) Gérer suppresion de l'audioNode dans le tableau et actualiser connexion
-    // 2) Bug visuel du bouton de suppresion de plugin à corriger
-    // 3) Virer tous plugins n'ayant aucun input (DrumMachine, Synthe)
-    // 3) Gérer déplacement pédale (gérer le déplacement aussi dans le tableau d'audioNode et actualiser les connexions)
-    // 4) Faire précédent dans le menu des choix des plugins
-    // 5) Faire du rack une wap
-
-
+    hideMenu() {
+        if (this.div_plugins.classList.contains(`hideMenu`)) {
+            this.div_plugins.classList.remove(`hideMenu`);
+            this.bt_hideMenu.innerHTML = `>`;
+            this.pluginsList.style.width=`calc(100% - 500px)`;
+        } else {
+            this.div_plugins.classList.add(`hideMenu`);
+            this.bt_hideMenu.innerHTML = `<`;
+            this.pluginsList.style.width=`100%`;
+        }
+    }
     /*      CHARGEMENT DU REPO DE PLUGINS A L'ININTIALISATION DE LA PAGE    */
     //Chargement des scripts des plugins
     loadJSONPlugins() {
@@ -431,7 +474,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         let _elements = ``;
         Object.keys(_pluginsJSON).map(
             (elem, index) => {
-                if (elem !== `synth` && elem !== `AmpSim`) _elements += `<option>${elem}</option>`;
+                if (elem !== `synth`) _elements += `<option>${elem}</option>`;
             }
         )
         this.select_plugins.insertAdjacentHTML(`beforeEnd`, _elements);
@@ -442,59 +485,19 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         let _elements = ``;
         Object.keys(_categoryPluginJSON).map(
             (elem, index) => {
-                console.log(elem, _categoryPluginJSON[elem]);
                 _elements += `<img id='img_${elem}' src='${_categoryPluginJSON[elem].url}/${_categoryPluginJSON[elem].thumbnail.replace(`./`, ``)}' title='${_categoryPluginJSON[elem].name}' alt='${_categoryPluginJSON[elem].name}' />`;
             }
         )
         this.nav_plugins.innerHTML = _elements;
-        let className;
         let _plugin;
         this.nav_plugins.querySelectorAll(`img`).forEach(img => img.onclick = () => {
             //loadPlugin
             _plugin = _categoryPluginJSON[parseInt(img.id.replace(`img_`, ``))];
-            this.loadPluginFromWasabi((_plugin.vendor + _plugin.name), _plugin.url, _plugin.category,_plugin.name);
+            this.loadPluginFromWasabi((_plugin.vendor + _plugin.name), _plugin.url, _plugin.category, _plugin.name);
         });
     }
 
     /*      GESTION DU MENU DU CHOIX DE PLUGIN ET DE LA CREATION DU PLUGIN   */
-
-    //Après avoir choisi l'ampli dans la liste de selection, charge l'ampli
-    chooseAmp(e) {
-        e.currentTarget.remove();
-        let amp = document.createElement("div");
-        amp.id = "Amp";
-        this.ampSimsList.append(amp);
-        for (let i = 0; i < this.ampList.length; i++) {
-            let ampListChoose = document.createElement("div");
-            ampListChoose.className = "ampListChoose";
-            ampListChoose.id = this.ampList[i];
-            ampListChoose.innerText = this.ampList[i];
-            amp.append(ampListChoose);
-
-            this.choiceAmp = this.shadowRoot.querySelectorAll(".ampListChoose");
-            this.choiceAmp[i].addEventListener("click", (e) => this.loadAmp(e));
-        }
-    }
-
-
-    loadAmp(e) {
-        for (let i = 0; i < this.pluginListJson.length; i++) {
-            if (e.currentTarget.innerText == this.pluginListJson[i].name) {
-                let className = this.pluginListJson[i].vendor + this.pluginListJson[i].name;
-                this.loadPluginFromWasabi(className, this.pluginListJson[i].url, this.pluginListJson[i].category);
-            }
-        }
-    }
-
-    deleteAmp(e) {
-        e.currentTarget.parentNode.parentNode.remove();
-        let addAmp = document.createElement("div");
-        addAmp.id = "addAmp";
-        addAmp.innerText = "+";
-        this.ampSimsList.append(addAmp);
-        this.addAmp = this.shadowRoot.querySelector("#addAmp");
-        this.addAmp.addEventListener("click", (e) => this.chooseAmp(e));
-    }
 
     //Supprimer un plugin chargé
     deletePlugin(e) {
@@ -502,13 +505,13 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
     }
 
     //Requete et chargement du plugin auprès du repo
-    loadPluginFromWasabi(className, baseURL, category,_pluginName) {
+    loadPluginFromWasabi(className, baseURL, category, _pluginName) {
         let scriptURL = baseURL + "/main.js";
 
         if (this.scriptExists(scriptURL)) {
             //script exists
             console.log("SCRIPT EXISTS WE JUST INSTANCIATE THE PLUGIN");
-            this.buildPlugin(className, baseURL, category,_pluginName);
+            this.buildPlugin(className, baseURL, category, _pluginName);
             return;
         }
 
@@ -521,7 +524,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         let parent = this;
         script.onload = function () {
             // Once the script has been loaded instanciate the plugin
-            parent.buildPlugin(className, baseURL, category,_pluginName);
+            parent.buildPlugin(className, baseURL, category, _pluginName);
         }
 
         // will be executed before the onload above...
@@ -532,9 +535,9 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         return document.querySelectorAll(`script[src="${url}"]`).length > 0;
     }
 
-    buildPlugin(className, baseURL, category,_pluginName) {
-        console.log("category",category);
-        console.log("className",className);
+    buildPlugin(className, baseURL, category, _pluginName) {
+        console.log("category", category);
+        console.log("className", className);
         var plugin = new window[className](this.ctx, baseURL);
         console.log(plugin);
         let parent = this;
@@ -544,21 +547,14 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             // Then use the factory to create the HTML custom elem that holds the GUI
             // The loadGUI method takes care of inserting the link rel=import part,
             // not doing it twice, and associate the node with its GUI.
-            if (category == "AmpSim") {
-                node.type = "amp";
-            } else {
-                node.type = "plugin";
-            }
+            if (category == "AmpSim") node.type = "amp";
+            else node.type = "plugin";
+
             this.audioConnexion(node);
             plugin.loadGui().then((elem) => {
                 console.log("ADDING PLUGIN");
                 // show the GUI of the plugn, the audio part is ready to be used
-                if (category != "AmpSim") {
-                    parent.addDivWithPlugin(elem,category,_pluginName);
-                } else {
-                    parent.addDivWithAmp(elem);
-                }
-
+                parent.addDivWithPlugin(elem, category, _pluginName);
             });
         });
 
@@ -568,96 +564,59 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         let lastConnexion;
         let lastIndex = this.audioPluginConnexion.length - 1;
         if (node.type != "amp") {
-            if (this.audioPluginConnexion.length > 0 && this.audioPluginConnexion[lastIndex].type != "amp") {
-                this.audioPluginConnexion.push(node);
-            } else {
-                this.audioPluginConnexion.splice(lastIndex - 2, 0, node);
-            }
-
+            if (this.audioPluginConnexion.length > 0 && this.audioPluginConnexion[lastIndex].type != "amp") this.audioPluginConnexion.push(node);
+            else this.audioPluginConnexion.splice(lastIndex - 2, 0, node);
         }
-        else {
-            //L'audioNode de l'ampli est forcément dernier s'il est invoqué
-            this.audioPluginConnexion.push(node);
-        }
+        //L'audioNode de l'ampli est forcément dernier s'il est invoqué
+        else this.audioPluginConnexion.push(node);
 
         this.mediaSource.connect(this.audioPluginConnexion[0]);
         if (this.audioPluginConnexion.length > 1) {
             for (let i = 0; i < this.audioPluginConnexion.length - 1; i++) {
-                console.log("plug1: ", this.audioPluginConnexion[i]);
-                console.log("plug2: ", this.audioPluginConnexion[i + 1]);
+                console.log("plug1+2: ", this.audioPluginConnexion[i], this.audioPluginConnexion[i + 1]);
                 this.audioPluginConnexion[i].connect(this.audioPluginConnexion[i + 1]);
                 lastConnexion = this.audioPluginConnexion[i + 1];
             }
-        } else if (this.audioPluginConnexion.length == 1) {
-            lastConnexion = this.audioPluginConnexion[0];
-        }
+        } else if (this.audioPluginConnexion.length == 1) lastConnexion = this.audioPluginConnexion[0];
         console.log(this.audioPluginConnexion);
         console.log(lastConnexion);
         lastConnexion.connect(this.ctx.destination);
     }
 
-    addDivWithAmp(elem) {
-        this.root.querySelector("#Amp").remove();
+    addDivWithPlugin(elem, category, _pluginName) {
+
         let mainDiv = document.createElement("div");
         mainDiv.id = elem.localName + "_" + this.instanciation;
-        mainDiv.className = "invokedAmp";
-
-        let optionAmp = document.createElement("div");
-        optionAmp.id = "optionMenuAmp_" + elem.localName + this.instanciation;
-        optionAmp.className = "optionMenu";
 
         let deleteButton = document.createElement("button");
         deleteButton.className = "deleteButton";
         deleteButton.id = "delete_" + elem.localName + "_" + this.instanciation;
         deleteButton.innerText = "X";
-
-        this.ampSimsList.append(mainDiv);
-        optionAmp.append(deleteButton);
-        mainDiv.append(optionAmp);
-        mainDiv.append(elem);
-
-
-        this.deleteButton = this.root.querySelector("#delete_" + elem.localName + "_" + this.instanciation).addEventListener("click", (e) => this.deleteAmp(e));
-    }
-
-    addDivWithPlugin(elem,category,_pluginName) {
-
-        //this.root.querySelector("#Plugin2").remove();
-        let mainDiv = document.createElement("div");
-        mainDiv.id = elem.localName + "_" + this.instanciation;
-        mainDiv.className = "invokedPlugin";
 
         let optionPlugin = document.createElement("div");
         optionPlugin.id = "optionMenu_" + elem.localName + this.instanciation;
         optionPlugin.className = "optionMenu";
 
+        elem.className = 'new_plugin';
 
-        let divSpan = document.createElement("div");
         let spanPlugin = document.createElement("span");
-        let spanCategory = document.createElement("span");
-
         spanPlugin.innerText = _pluginName;
+        let spanCategory = document.createElement("span");
         spanCategory.innerText = category;
 
-        let deleteButton = document.createElement("button");
-        deleteButton.className = "deleteButton";
-        deleteButton.id = "delete_" + elem.localName + "_" + this.instanciation;
-        deleteButton.innerText = "X";
-
-
-        this.pluginsList.append(mainDiv);
+        let divSpan = document.createElement("div");
         divSpan.append(spanPlugin);
         divSpan.append(spanCategory);
-        elem.className='new_plugin';
         divSpan.append(elem);
         optionPlugin.append(divSpan);
         optionPlugin.append(deleteButton);
         mainDiv.append(optionPlugin);
-        // mainDiv.append(elem);
+
+        if (category == `AmpSim`) this.ampSimsList.append(mainDiv);
+        else this.pluginsList.append(mainDiv);
 
         this.deleteButton = this.root.querySelector("#delete_" + elem.localName + "_" + this.instanciation).addEventListener("click", (e) => this.deletePlugin(e));
-
-        this.instanciation++;
+        if (category != `AmpSim`) this.instanciation++;
     }
 
     /*createItemLI(_name) {
