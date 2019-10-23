@@ -68,8 +68,9 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             border-top-right-radius: 4px;
             padding: 5px;
             margin: 2px;
+            height:260px;
             position: relative;
-            justify-content: center;
+            justify-content: flex-start;
         }
         .optionMenu div{
             display:flex;
@@ -416,11 +417,11 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         if (this.div_plugins.classList.contains(`hideMenu`)) {
             this.div_plugins.classList.remove(`hideMenu`);
             this.bt_hideMenu.innerHTML = `>`;
-            this.pluginsList.style.width=`calc(100% - 500px)`;
+            this.pluginsList.style.width = `calc(100% - 500px)`;
         } else {
             this.div_plugins.classList.add(`hideMenu`);
             this.bt_hideMenu.innerHTML = `<`;
-            this.pluginsList.style.width=`100%`;
+            this.pluginsList.style.width = `100%`;
         }
     }
     /*      CHARGEMENT DU REPO DE PLUGINS A L'ININTIALISATION DE LA PAGE    */
@@ -612,11 +613,30 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         optionPlugin.append(deleteButton);
         mainDiv.append(optionPlugin);
 
-        if (category == `AmpSim`) this.ampSimsList.append(mainDiv);
-        else this.pluginsList.append(mainDiv);
+        if (category == `AmpSim`) {
+            // Supprime tous les enfant d'un élément
+            var element = this.ampSimsList;
+            while (element.firstChild) {
+                element.removeChild(element.firstChild);
+            }
+            // ensuite, on ajoute le nouveau ampsim
+            this.ampSimsList.append(mainDiv);
+        } else {
+            this.pluginsList.insertAdjacentElement(`beforeEnd`, mainDiv);
+
+            // resize plugins
+            let w = elem.offsetWidth;
+            let h = elem.offsetHeight;
+            let scale = 200 / h;
+
+            elem.style.transform = "scale(" + scale + "," + scale + ")";
+            elem.style.transformOrigin = "50% 0%";
+            optionPlugin.style.width = `${(w + 40) * scale}px`;
+        }
 
         this.deleteButton = this.root.querySelector("#delete_" + elem.localName + "_" + this.instanciation).addEventListener("click", (e) => this.deletePlugin(e));
         if (category != `AmpSim`) this.instanciation++;
+
     }
 
     /*createItemLI(_name) {
