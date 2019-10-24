@@ -182,9 +182,9 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             font-size:20px;
         }
 
-        #div_menu ul li img[dropActive=true]{
+        #div_menu ul li div.optionMenu[dropActive=true]{
             box-shadow:0px 3px 10px #000;
-            border:3px dashed lightgreen;
+            background:lightgreen !important;
         }
 
         #addAmp{
@@ -377,40 +377,6 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
 
         this.select_plugins.onchange = (e) => this.selectCategory(e);
         this.bt_hideMenu.onclick = () => this.hideMenu();
-
-
-
-        //Chargement des plugins depuis le repo et classement par famille
-        let _amp = []
-        let _pluginsCategory = [];
-        let _index, _count;
-        _index = _count = 0;
-        let _li;
-        this.fetchJSON(this.pathJSON).then((_d) => {
-            for (const p in _d.plugs) {
-                this.fetchJSON(`${_d.plugs[p]}/main.json`).then((_p) => {
-                    _count++;
-                    let option = document.createElement("option");
-                    if (_p.category != "AmpSim" && !_pluginsCategory.includes(_p.category)) {
-                        _pluginsCategory.push(_p.category);
-                        option.text = _p.category;
-                    }
-                    if (_p.category == "AmpSim") {
-                        //this.ampSimsList.insertAdjacentElement(`beforeEnd`, this.createItem(_count, _d, _p, p));
-                        _amp.push(_p.name);
-                    }
-                    else {
-                        _p.url = _d.plugs[p];
-                        //this.pluginsList.insertAdjacentElement(`beforeEnd`, this.createItem(_count, _d, _p, p));
-                    }
-                });
-                //if (_index == Object.keys(_d.plugs).length-1)
-                _index++;
-            }
-            this.categoryPlugins = _pluginsCategory;
-            this.ampList = _amp;
-        })
-
     }
 
     hideMenu() {
@@ -424,6 +390,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             this.pluginsList.style.width = `100%`;
         }
     }
+
     /*      CHARGEMENT DU REPO DE PLUGINS A L'ININTIALISATION DE LA PAGE    */
     //Chargement des scripts des plugins
     loadJSONPlugins() {
@@ -475,7 +442,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         let _elements = ``;
         Object.keys(_pluginsJSON).map(
             (elem, index) => {
-                if (elem !== `synth`) _elements += `<option>${elem}</option>`;
+                if (elem !== `synth` && elem !== `Mixing`) _elements += `<option>${elem}</option>`;
             }
         )
         this.select_plugins.insertAdjacentHTML(`beforeEnd`, _elements);
@@ -494,25 +461,24 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         this.nav_plugins.querySelectorAll(`img`).forEach(img => img.onclick = () => {
             //loadPlugin
             _plugin = _categoryPluginJSON[parseInt(img.id.replace(`img_`, ``))];
-            this.loadPluginFromWasabi((_plugin.vendor + _plugin.name), _plugin.url, _plugin.category, _plugin.name);
+            this.loadPluginFromWasabi((_plugin.vendor + _plugin.name), _plugin.url, _plugin.category, _plugin.name,img.src);
         });
     }
 
     /*      GESTION DU MENU DU CHOIX DE PLUGIN ET DE LA CREATION DU PLUGIN   */
-
     //Supprimer un plugin chargé
     deletePlugin(e) {
         e.currentTarget.parentNode.parentNode.remove();
     }
 
     //Requete et chargement du plugin auprès du repo
-    loadPluginFromWasabi(className, baseURL, category, _pluginName) {
+    loadPluginFromWasabi(className, baseURL, category, _pluginName,_imgSRC) {
         let scriptURL = baseURL + "/main.js";
 
         if (this.scriptExists(scriptURL)) {
             //script exists
             console.log("SCRIPT EXISTS WE JUST INSTANCIATE THE PLUGIN");
-            this.buildPlugin(className, baseURL, category, _pluginName);
+            this.buildPlugin(className, baseURL, category, _pluginName,_imgSRC);
             return;
         }
 
@@ -525,7 +491,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         let parent = this;
         script.onload = function () {
             // Once the script has been loaded instanciate the plugin
-            parent.buildPlugin(className, baseURL, category, _pluginName);
+            parent.buildPlugin(className, baseURL, category, _pluginName,_imgSRC);
         }
 
         // will be executed before the onload above...
@@ -536,11 +502,8 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         return document.querySelectorAll(`script[src="${url}"]`).length > 0;
     }
 
-    buildPlugin(className, baseURL, category, _pluginName) {
-        console.log("category", category);
-        console.log("className", className);
+    buildPlugin(className, baseURL, category, _pluginName,_imgSRC) {
         var plugin = new window[className](this.ctx, baseURL);
-        console.log(plugin);
         let parent = this;
 
         plugin.load().then((node) => {
@@ -555,7 +518,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             plugin.loadGui().then((elem) => {
                 console.log("ADDING PLUGIN");
                 // show the GUI of the plugn, the audio part is ready to be used
-                parent.addDivWithPlugin(elem, category, _pluginName);
+                parent.addDivWithPlugin(elem, category, _pluginName,_imgSRC);
             });
         });
 
@@ -584,10 +547,13 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         lastConnexion.connect(this.ctx.destination);
     }
 
-    addDivWithPlugin(elem, category, _pluginName) {
+    addDivWithPlugin(elem, category, _pluginName,_imgSRC) {
+        elem.className = 'new_plugin';
 
         let mainDiv = document.createElement("div");
         mainDiv.id = elem.localName + "_" + this.instanciation;
+        mainDiv.className = `divMain`;
+        mainDiv.setAttribute(`data-src`, _imgSRC);
 
         let deleteButton = document.createElement("button");
         deleteButton.className = "deleteButton";
@@ -596,9 +562,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
 
         let optionPlugin = document.createElement("div");
         optionPlugin.id = "optionMenu_" + elem.localName + this.instanciation;
-        optionPlugin.className = "optionMenu";
-
-        elem.className = 'new_plugin';
+        optionPlugin.className = "optionMenu";_imgSRC
 
         let spanPlugin = document.createElement("span");
         spanPlugin.innerText = _pluginName;
@@ -622,7 +586,21 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             // ensuite, on ajoute le nouveau ampsim
             this.ampSimsList.append(mainDiv);
         } else {
-            this.pluginsList.insertAdjacentElement(`beforeEnd`, mainDiv);
+            let _order = this.pluginsList.querySelectorAll(`li`).length;
+            mainDiv.setAttribute(`draggable`, true);
+            let liPlugin = document.createElement("li");
+            liPlugin.setAttribute(`data-order`, _order);
+            liPlugin.style = `order:${_order}`;
+            liPlugin.append(mainDiv);
+
+            this.pluginsList.insertAdjacentElement(`beforeEnd`, liPlugin);
+
+            liPlugin.ondrop = (e) => this.drop(e);
+            liPlugin.ondragenter = (e) => this.enterDrop(e);
+            liPlugin.ondragover = (e) => this.overDrag(e);
+            liPlugin.ondragend = (e) => this.endDrag(e);
+            liPlugin.ondragleave = (e) => this.leaveDrag(e);
+            mainDiv.ondragstart = (e) => this.startDrag(e);
 
             // resize plugins
             let w = elem.offsetWidth;
@@ -636,65 +614,69 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
 
         this.deleteButton = this.root.querySelector("#delete_" + elem.localName + "_" + this.instanciation).addEventListener("click", (e) => this.deletePlugin(e));
         if (category != `AmpSim`) this.instanciation++;
-
     }
 
-    /*createItemLI(_name) {
-        let _li = document.createElement(`li`);
-        _li.id = `li_${_name}`;
-        _li.innerText = _name;
-        return _li;
-    }*/
+    // DRAG & DROP POUR PERMETTRE DE SWITCHER ENTRE LES PLUGINS
+    startDrag(ev) {
+        console.log('drag =>', ev.target.id);
+        ev.dataTransfer.setData(`text/plain`, ev.target.id);
 
-    /*      GESTION DE L'AFFICHAGE ET DE LA CREATION DES AMPS      */
-
-    createItem(_count, _d, _p, p) {
-        let _li, _img;
-
-        _li = document.createElement(`li`);
-        if (_p.category != "AmpSim") _li.className = `hidden`;
-        _li.id = `li_${_count}`;
-        _li.setAttribute(`data-category`, _p.category);
-
-        _img = document.createElement(`img`);
-        _img.id = `img_${_count}`;
-        _img.title = _p.name;
-        _img.setAttribute(`draggable`, true);
-        _img.src = `${_d.plugs[p]}/${_p.thumbnail}`;
-        _li.insertAdjacentElement(`beforeEnd`, _img);
-
-        _li.ondrop = (e) => this.drop(e);
-        _li.ondragover = (e) => this.allowDrop(e);
-        _li.ondragleave = (e) => this.leaveDropZone(e);
-        _img.ondragstart = (e) => this.drag(e);
-
-        return _li;
+        var dragImg = new Image(); // Il est conseillé de précharger l'image, sinon elle risque de ne pas s'afficher pendant le déplacement
+        dragImg.src = ev.target.getAttribute(`data-src`);
+        ev.dataTransfer.setDragImage(dragImg, 40, 40);
     }
 
-    // PERMET DE SWITCHER ENTRE LES PLUGINS
-    allowDrop(ev) {
-        ev.target.setAttribute(`dropActive`, true);
+    overDrag(ev) {
         ev.preventDefault();
+        if (ev.target.classList.contains(`optionMenu`)) ev.target.setAttribute(`dropActive`, true);
     }
 
-    leaveDropZone(ev) {
+    leaveDrag(ev) {
         ev.target.removeAttribute(`dropActive`);
+    }
+
+    endDrag(ev){
+    }
+
+    enterDrop(ev) {
+        //if (ev.target.classList.contains(`optionMenu`)) ev.target.setAttribute(`dropActive`, true);
     }
 
     drop(ev) {
+        let _order_from = 0;
+        let _order_to = 0;
+        // dépôt de l'élément
         ev.preventDefault();
-        ev.target.removeAttribute(`dropActive`);
-        var src = this.shadowRoot.querySelector(`#${ev.dataTransfer.getData("src")}`);
-        var srcParent = src.parentNode;
-        var tgt = ev.currentTarget.firstElementChild;
+        //ev.target.removeAttribute(`dropActive`);
 
+        var src_from = this.shadowRoot.querySelector(`#${ev.dataTransfer.getData(`text/plain`)}`).parentNode;
+        console.log(`src_parent`, src_from); // li > wasabi-pingpongdelay_1
+        console.log('src_element', src_from.firstElementChild); // wasabi-pingpongdelay_1
+        _order_from = (src_from.getAttribute(`data-order`));
+
+        var src_destination = ev.currentTarget;
+        console.log('src_currentTarget_parent', src_destination); // li > faust-zitarev2_0
+        console.log('src_currentTarget', src_destination.firstElementChild); // faust-zitarev2_0
+        _order_to = (src_destination.getAttribute(`data-order`));
+
+
+
+        /*
+        // Uncaught TypeError: Cannot redefine property: src
+        // replacedNode = parentNode.replaceChild(newChild, oldChild);
         ev.currentTarget.replaceChild(src, tgt);
-        srcParent.appendChild(tgt);
-        console.log('drop =>', ev.currentTarget.id);
-    }
 
-    drag(ev) {
-        console.log('drag =>', ev.target.id);
-        ev.dataTransfer.setData("src", ev.target.id);
+        var element = src_from;
+        while (element.firstChild) {
+            element.removeChild(element.firstChild);
+        }
+        src_from.appendChild(tgt);
+        */
+
+        // solution alternative CSS: switch order
+        src_from.style = `order:${_order_to}`;
+        src_from.setAttribute(`data-order`, _order_to);
+        src_destination.style = `order:${_order_from}`;
+        src_destination.setAttribute(`data-order`, _order_from);
     }
 })
