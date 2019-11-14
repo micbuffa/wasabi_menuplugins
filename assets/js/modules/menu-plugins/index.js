@@ -1,15 +1,5 @@
-//lien: https://jsbin.com/zelepix/edit?html,js,console,output
-
-// 1) Gérer suppression de l'audioNode dans le tableau et actualiser connexion
-// --- 2) Bug visuel du bouton de suppression de plugin à corriger
-// --- 3) Virer tous plugins n'ayant aucun input (DrumMachine, Synthe)
-// 3) Gérer déplacement pédale (gérer le déplacement aussi dans le tableau d'audioNode et actualiser les connexions)
-// --- 4) Faire précédent dans le menu des choix des plugins
-// 5) Faire du rack une wap
-
 customElements.define(`menu-plugins`, class extends HTMLElement {
 
-    // test
     constructor() {
         super();
         this.root = this.attachShadow({ mode: `open` });
@@ -41,7 +31,6 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         
             border-collapse: collapse;
             box-sizing: border-box;
-            font-family: helvetica;
         }
         *:focus {
             outline: 0;
@@ -54,8 +43,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             background: #333;
             display: flex;
             flex-direction: column;
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
+            border-radius: 4px;
             padding: 5px;
             margin: 2px;
             height:260px;
@@ -105,11 +93,41 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             justify-content: center;
         }
         #pluginsList{
-            height:500px;
+            /* height:500px; */
+            min-height:294px;
             width:calc(100% - 500px);
             z-index:1;
             transition:1s;
         }
+        #pluginsList li{
+            display:flex;
+            flex-direction:row;
+            justify-content:flex-start;
+            align-items: center;
+            position:relative;
+        }
+        #pluginsList li div.divDroppable[drop-active=true] {
+            border: 2px dashed darkgreen;
+            background: lightgreen;
+        }
+        #pluginsList li div.divDroppable{
+            border: 2px dashed #444;
+            border-radius: 4px;
+            opacity:0;
+            transition:0.1s;
+
+            position: absolute;
+            top: -20px;
+            left: -20px;
+            right: -20px;
+            bottom: -20px;
+            z-index:-1;
+        }
+        #pluginsList li.showDroppable div.divDroppable{
+            opacity:0.3 !important;
+            z-index:99 !important;
+        }
+
         #pluginsList li img{
             height:200px;
         }
@@ -133,7 +151,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             overflow-y: hidden;
         }
         #div_menu ul li{
-            margin:5px;
+            margin:20px;
         }
         #div_menu ul li img{
             box-shadow:0px 3px 4px #111;
@@ -223,19 +241,6 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             width:calc(100% - 40px);
             margin:20px;
             border-radius:0px;
-        }
-
-        .liDrop[drop-active=true] {
-            border: 2px solid darkgreen;
-            background: lightgreen;
-        }
-
-        .liDrop {
-            border: 2px solid #ccc;
-            width: 260px;
-            height: 260px;
-            padding: 20px;
-            flex: 0;
         }
         `;
         this.html = `
@@ -409,7 +414,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             if (_pluginSettings.category == `AmpSim`) node.type = `amp`;
             else node.type = `plugin`;
 
-            // 24 octobre 2019 - à décommenter
+            // à décommenter
             // this.audioConnexion(node);
 
             plugin.loadGui().then((elem) => {
@@ -450,10 +455,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         let bt_deletePlugin = document.createElement(`button`);
         bt_deletePlugin.className = `bt_deletePlugin`;
         bt_deletePlugin.innerText = `X`;
-        bt_deletePlugin.onclick = (e) => {
-            this.deletePlugin(e);
-            this.initDropZone();
-        };
+        bt_deletePlugin.onclick = (e) => this.deletePlugin(e);
 
         // sp_categoryPlugin
         let sp_categoryPlugin = document.createElement(`span`);
@@ -479,7 +481,13 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
 
         // li > divContainer
         let liPlugin = document.createElement(`li`);
+        let divDroppable = document.createElement(`div`);
+        divDroppable.classList.add(`divDroppable`);
+        liPlugin.append(divDroppable);
         liPlugin.append(divContainer);
+
+        liPlugin.setAttribute(`data-order`, this.instanciation);
+        liPlugin.style = `order:${this.instanciation}`;
 
         // add the plugin in ampSimsList or pluginsList
         if (_pluginSettings.category == `AmpSim`) {
@@ -487,7 +495,7 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
             this.ampSimsList.insertAdjacentElement(`beforeend`, liPlugin);
         } else {
             this.pluginsList.insertAdjacentElement(`beforeend`, liPlugin);
-            this.initDropZone();
+            this._setDragAndDroplistener(liPlugin);
         }
 
         // resizePlugin
@@ -509,109 +517,86 @@ customElements.define(`menu-plugins`, class extends HTMLElement {
         while (element.firstChild) element.removeChild(element.firstChild);
     }
 
-    // DROPZONE: create/delete
-    initDropZone() {
-        this.deleteDropZone();
-
-        let _nbLIplugins = this.pluginsList.querySelectorAll(`li`).length - 1;
-        let _liDrop = ``;
-        this.pluginsList.querySelectorAll(`li`).forEach((_li, _index) => {
-            if (!_li.classList.contains(`liDrop`)) {
-                _liDrop = `<li class='liDrop'></li>`
-                _li.insertAdjacentHTML(`beforebegin`, _liDrop);
-                if (_index == _nbLIplugins) _li.insertAdjacentHTML(`afterend`, _liDrop);
-            }
-        })
-
-        this._setDragAndDroplistener();
+    getOrderArray() {
+        let _tab = [];
+        let _nbLI = this.pluginsList.querySelectorAll(`li`).length;
+        for (let i = 0; i < _nbLI; i++) {
+            this.pluginsList.querySelectorAll(`li`).forEach((_li, _index) => {
+                if (_li.style.order == i) _tab.push(parseInt(_li.getAttribute(`data-order`)));
+            });
+        }
+        return _tab;
     }
-    deleteDropZone() { this.pluginsList.querySelectorAll(`li.liDrop`).forEach(_li => _li.remove()); };
 
+    showDroppableElements(_visible = true) {
+        this.shadowRoot.querySelector(`#pluginsList`).querySelectorAll(`li`).forEach(_li => {
+            if (_visible) _li.classList.add(`showDroppable`);
+            else _li.classList.remove(`showDroppable`);
+        })
+    }
+    
     // DRAG & DROP
-    _setDragAndDroplistener() {
-        let _elem = ``;
-        this.pluginsList.querySelectorAll('li').forEach(_li => {
-            if (_li.classList.contains(`liDrop`)) {
-                _li.ondragenter = (event) => this.dragEnter(event);
-                _li.ondragover = (event) => this.allowDrop(event);
-                _li.ondragleave = (event) => this.leaveDropZone(event);
-                _li.ondrop = (event) => this.drop(event);
-            } else {
-                _elem = _li.querySelector(`div.divContainer`);
-                _elem.setAttribute(`draggable`, true);
-                _elem.ondragstart = (event) => this.dragStart(event);
-            }
-        });
+    _setDragAndDroplistener(_li) {
+        let _elemDroppable = _li.querySelector(`div.divDroppable`);
+        _elemDroppable.ondragenter = (event) => this.dragEnter(event);
+        _elemDroppable.ondragover = (event) => this.allowDrop(event);
+        _elemDroppable.ondragleave = (event) => this.leaveDropZone(event);
+        _elemDroppable.ondrop = (event) => this.drop(event);
+
+        let _elem = _li.querySelector(`div.divContainer`);
+        _elem.setAttribute(`draggable`, true);
+        _elem.ondragstart = (event) => this.dragStart(event);
+        _elem.ondragend = (event) => this.dragEnd(event);
     }
 
     // 1 - ondragstart => start dragged
     dragStart(event) {
-        console.log(`drag =>`, event.target.id);
         event.dataTransfer.setData(`text/plain`, event.target.id);
         this.dragImg.src = event.target.getAttribute(`data-src`);
         event.dataTransfer.setDragImage(this.dragImg, -10, -10);
+        this.showDroppableElements();
     }
 
     // 2 - ondragenter
     dragEnter(event) {
-        if (event.target.nodeName == `LI`) event.target.setAttribute(`drop-active`, true);
+        if (event.target.className == `divDroppable`) event.target.setAttribute(`drop-active`, true);
     }
 
-    // 3 - ondragover
+    // 3 - ondragend
+    dragEnd() {
+        this.showDroppableElements(false);
+    }
+
+    // 4 - ondragover
     allowDrop(event) {
         event.preventDefault();
     }
 
-    // 4 - leaveDropZone
+    // 5 - ondragleave
     leaveDropZone(event) {
-        if (event.target.nodeName == `LI`) event.target.removeAttribute(`drop-active`);
+        if (event.target.className == `divDroppable`) event.target.removeAttribute(`drop-active`);
     }
 
-    // 5 - ondrop
+    // 6 - ondrop
     drop(event) {
         event.preventDefault();
-        if (event.target.nodeName == `LI`) {
+        if (event.target.className == `divDroppable`) {
             event.target.removeAttribute(`drop-active`);
 
-            // _divContainer
-            var _divContainer = this.shadowRoot.querySelector(`#${event.dataTransfer.getData(`text/plain`)}`); //.cloneNode(true);
-            console.log(_divContainer);
+            // swipe plugins
+            let _orderA = parseInt(this.shadowRoot.querySelector(`#${event.dataTransfer.getData(`text/plain`)}`).parentNode.getAttribute(`data-order`));
+            let _orderB = parseInt(event.target.parentNode.getAttribute(`data-order`));
 
-            // li > _divContainer
-            let parentLi = _divContainer.parentNode;
-            console.log(parentLi);
+            let _orderArray = this.getOrderArray();
+            let index = _orderArray.indexOf(_orderA);
+            let indexB = _orderArray.indexOf(_orderB);
+            if (index > -1) _orderArray.splice(index, 1);
+            _orderArray.splice(indexB, 0, _orderA);
 
-            // li.liDrop
-            event.target.classList.remove(`liDrop`);
-            event.target.insertAdjacentElement(`beforeend`, _divContainer);
+            _orderArray.forEach((_v, _index) => this.shadowRoot.querySelector(`#pluginsList`).querySelector(`li[data-order="${_v}"]`).style.order = _index);
 
-            this.pluginsList.removeChild(parentLi.firstChild);
-            this.initDropZone();
-
-
-
-
-
-
-
-            // let _listPlugins=this.pluginsList.querySelectorAll(`li`);
-            // replaceChild + insertBefore... doesn't work
-
-            // SOLUTION alternative: CSS ORDER ça marche juste pour la visu..
-            /*
-                let _order_from = 0;
-                let _order_to = 0;
-    
-                var src_from = this.shadowRoot.querySelector(`#${event.dataTransfer.getData(`text/plain`)}`).parentNode;
-                console.log(`src_parent`, src_from); // li > wasabi-pingpongdelay_1
-                console.log(`src_element`, src_from.firstElementChild); // wasabi-pingpongdelay_1
-                _order_from = (src_from.getAttribute(`data-order`));
-    
-                var src_destination = event.currentTarget;
-                console.log(`src_currentTarget_parent`, src_destination); // li > faust-zitarev2_0
-                console.log(`src_currentTarget`, src_destination.firstElementChild); // faust-zitarev2_0
-                _order_to = (src_destination.getAttribute(`data-order`));
-            */
+            // hide droppable elements
+            this.showDroppableElements(false);
         }
     }
 })
