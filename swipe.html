@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>swipe</title>
+    <link rel="icon" href="assets/img/favicon.ico">
+</head>
+
+<body>
+    <style>
+        * {
+            border: 0px;
+            margin: 0px;
+            padding: 0px;
+
+            border-collapse: collapse;
+            box-sizing: border-box;
+            font-family: helvetica;
+        }
+
+        *:focus {
+            outline: 0;
+        }
+
+        /* ***** ***** */
+        body {}
+
+        ul {
+            list-style: none;
+            display: flex;
+            flex-direction: row;
+        }
+
+        ul li {
+            border: 2px solid #111;
+            margin: 0px 4px;
+        }
+
+        ul li span:hover {
+            background: dodgerblue;
+            color: #fff;
+        }
+
+        ul li span {
+            padding: 20px;
+            width: 120px;
+            display: block;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .liDrop[drop-active=true] {
+            border: 2px solid darkgreen;
+            background: lightgreen;
+        }
+
+        .liDrop {
+            border: 2px solid #ccc;
+            width: 20px;
+            padding: 20px;
+        }
+    </style>
+    <script>
+        var dragImg = new Image();
+        dragImg.src = `./assets/img/icon_128.ico`;
+        dragImg.width = `50`;
+        var _ul;
+
+        window.onload = () => {
+            console.log('page loaded');
+            _ul = document.querySelector(`#ul`);
+            createDropZone();
+        }
+
+        // DROPZONE: create/delete
+        let createDropZone = () => {
+            deleteDropZone();
+
+            let _nbLIplugins = _ul.querySelectorAll(`li`).length - 1;
+            let _liDrop = ``;
+            _ul.querySelectorAll(`li`).forEach((_li, _index) => {
+                if (!_li.classList.contains(`liDrop`)) {
+                    _liDrop = `<li id='li_${_index}' class='liDrop'></li>`
+                    _li.insertAdjacentHTML(`beforebegin`, _liDrop);
+                    if (_index == _nbLIplugins) _li.insertAdjacentHTML(`afterend`, _liDrop);
+                }
+            })
+
+            _setDragAndDroplistener();
+        }
+        let deleteDropZone = () => _ul.querySelectorAll(`li.liDrop`).forEach(_li => _li.remove());
+
+        // DRAG & DROP
+        let _setDragAndDroplistener = () => {
+            let _elem = ``;
+            _ul.querySelectorAll('li').forEach(_li => {
+                if (_li.classList.contains(`liDrop`)) {
+                    _li.ondragenter = (event) => dragEnter(event);
+                    _li.ondragover = (event) => allowDrop(event);
+                    _li.ondragleave = (event) => leaveDropZone(event);
+                    _li.ondrop = (event) => drop(event);
+                } else {
+                    _elem = _li.querySelector(`span`);
+                    _elem.setAttribute(`draggable`, true);
+                    _elem.ondragstart = (event) => dragStart(event);
+                }
+            });
+        }
+
+        // 1 - ondragstart => start dragged
+        let dragStart = (event) => {
+            event.dataTransfer.setData(`Text`, event.target.id);
+            event.dataTransfer.setDragImage(dragImg, -10, -10);
+        }
+
+        // 2 - ondragenter
+        let dragEnter = (event) => {
+            if (event.target.nodeName == `LI`) event.target.setAttribute(`drop-active`, true);
+        }
+
+        // 3 - ondragover
+        let allowDrop = (event) => {
+            event.preventDefault();
+        }
+
+        // 4 - leaveDropZone
+        let leaveDropZone = (event) => {
+            if (event.target.nodeName == `LI`) event.target.removeAttribute(`drop-active`);
+        }
+
+        // 5 - ondrop
+        let drop = (event) => {
+            event.preventDefault();
+            if (event.target.nodeName == `LI`) {
+                event.target.removeAttribute(`drop-active`);
+
+                var data = event.dataTransfer.getData(`Text`);
+                let parentLi = document.querySelector(`#${data}`).parentNode;
+                var _elem = document.querySelector(`#${data}`).cloneNode(true);
+                
+                let _li = document.createElement(`li`);
+                _li.appendChild(_elem);
+                event.target.insertAdjacentElement(`beforebegin`, _li);
+
+                _ul.removeChild(parentLi);
+
+                createDropZone();
+            }
+        }
+    </script>
+    <ul id='ul'>
+        <li><span id='one'>1</span></li>
+        <li><span id='two'>2</span></li>
+        <li><span id='three'>3</span></li>
+        <li><span id='four'>4</span></li>
+        <li><span id='five'>5</span></li>
+    </ul>
+</body>
+
+</html>
